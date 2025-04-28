@@ -76,9 +76,8 @@ for project_name, data in projects.items():
                 comments_db[project_name] = project_comments
                 with open(COMMENTS_FILE, "w") as f:
                     json.dump(comments_db, f, indent=2)
-                st.success("✅ Comment posted!")
-                st.experimental_rerun()
-
+                st.success("✅ Comment posted! Please refresh the page manually to see the update.")
+                
         st.markdown("-----")
 
 if changes_made:
