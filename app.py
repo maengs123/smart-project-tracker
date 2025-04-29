@@ -143,6 +143,7 @@ with st.form("new_project_form"):
         due = st.date_input(f"Target Date {i+1}", key=f"task_date_{i}")
         subtasks.append({"name": name, "progress": 0, "target_date": due.strftime("%Y-%m-%d")})
 
+    pw = st.text_input("Password to manage this project", type="password")
     submit = st.form_submit_button("Create Project")
     if submit and title and owner and pw:
         new_proj = {
