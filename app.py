@@ -25,7 +25,9 @@ st.set_page_config(page_title="Smart Project Tracker", layout="wide")
 st.title("📋 Smart Project Tracker Portal")
 
 # Filter by owner
-owners = sorted(set([proj['owner'] for proj in projects]))
+owners = sorted(set(proj['owner'] for proj in projects if 'owner' in proj))
+if not owners:
+    owners = []
 selected_owner = st.selectbox("🔍 Filter by Owner", ["All"] + owners)
 
 filtered_projects = [p for p in projects if selected_owner == "All" or p['owner'] == selected_owner]
