@@ -22,7 +22,8 @@ else:
 st.set_page_config(page_title="Smart Project Tracker", layout="wide")
 st.title("📋 Smart Project Tracker Portal")
 
-edit_index = st.session_state.get("edit_index", None)
+if "edit_unlocked_index" not in st.session_state:
+    st.session_state["edit_unlocked_index"] = None
 
 owners = sorted(set(proj['owner'] for proj in projects if 'owner' in proj))
 if not owners:
@@ -30,10 +31,6 @@ if not owners:
 selected_owner = st.selectbox("🔍 Filter by Owner", ["All"] + owners)
 
 filtered_projects = [p for p in projects if selected_owner == "All" or p['owner'] == selected_owner]
-
-# Temporary session variable for password-validated edit
-if "edit_unlocked_index" not in st.session_state:
-    st.session_state["edit_unlocked_index"] = None
 
 for idx, project in enumerate(filtered_projects):
     st.markdown(f"### 📁 {project['title']}")
@@ -102,7 +99,6 @@ for idx, project in enumerate(filtered_projects):
     with open(PROJECTS_FILE, "w") as f:
         json.dump(projects, f, indent=2)
 
-# Display inline edit form if password was validated
 edit_idx = st.session_state.get("edit_unlocked_index")
 if edit_idx is not None and edit_idx < len(projects):
     st.markdown("## ✏️ Edit Project")
@@ -124,7 +120,7 @@ if edit_idx is not None and edit_idx < len(projects):
             st.success("✅ Project updated! Please manually refresh the page to see changes.")
             st.session_state["edit_unlocked_index"] = None
 
-# Add New Project Form
+# Correct New Project Form
 st.markdown("---")
 st.markdown("## ➕ Add New Project")
 with st.form("new_project_form"):
@@ -133,7 +129,6 @@ with st.form("new_project_form"):
     target_period = st.text_input("Target Period (e.g., 1Q25)")
     notes = st.text_area("Notes")
     details = st.text_area("Full Description")
-    pw = st.text_input("Password to manage this project", type="password")
     
     task_count = st.number_input("How many subtasks?", min_value=1, max_value=20, step=1)
     subtasks = []
@@ -142,24 +137,10 @@ with st.form("new_project_form"):
         name = st.text_input(f"Task Name {i+1}", key=f"task_name_{i}")
         due = st.date_input(f"Target Date {i+1}", key=f"task_date_{i}")
         subtasks.append({"name": name, "progress": 0, "target_date": due.strftime("%Y-%m-%d")})
-
     
-    if submit and title and owner and pw:
-        new_proj = {
-            "title": title,
-            "owner": owner,
-            "target_period": target_period,
-            "notes": notes,
-            "details": details,
-            "password": pw,
-            "subtasks": subtasks
-        }
-        projects.append(new_proj)
-        with open(PROJECTS_FILE, "w") as f:
-            json.dump(projects, f, indent=2)
-        st.success("✅ Project added! Please manually refresh the page to view it.")
     pw = st.text_input("Password to manage this project", type="password")
     submit = st.form_submit_button("Create Project")
+
     if submit and title and owner and pw:
         new_proj = {
             "title": title,
@@ -174,4 +155,3 @@ with st.form("new_project_form"):
         with open(PROJECTS_FILE, "w") as f:
             json.dump(projects, f, indent=2)
         st.success("✅ Project added! Please manually refresh the page to view it.")
-
