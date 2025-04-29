@@ -7,14 +7,12 @@ from datetime import datetime
 PROJECTS_FILE = "projects.json"
 COMMENTS_FILE = "comments.json"
 
-# Load or initialize projects
 if os.path.exists(PROJECTS_FILE):
     with open(PROJECTS_FILE, "r") as f:
         projects = json.load(f)
 else:
     projects = []
 
-# Load or initialize comments
 if os.path.exists(COMMENTS_FILE):
     with open(COMMENTS_FILE, "r") as f:
         comments_db = json.load(f)
@@ -24,7 +22,8 @@ else:
 st.set_page_config(page_title="Smart Project Tracker", layout="wide")
 st.title("📋 Smart Project Tracker Portal")
 
-# Filter by owner
+edit_index = st.session_state.get("edit_index", None)
+
 owners = sorted(set(proj['owner'] for proj in projects if 'owner' in proj))
 if not owners:
     owners = []
@@ -32,14 +31,13 @@ selected_owner = st.selectbox("🔍 Filter by Owner", ["All"] + owners)
 
 filtered_projects = [p for p in projects if selected_owner == "All" or p['owner'] == selected_owner]
 
-# Show each project
+# Handle edits or deletions
 for idx, project in enumerate(filtered_projects):
     st.markdown(f"### 📁 {project['title']}")
     st.markdown(f"👤 **Owner:** {project['owner']} &nbsp;&nbsp; 🎯 **Target Period:** {project['target_period']}")
     st.markdown(f"📝 **Notes:** {project['notes']}")
     st.markdown(f"🔍 **Details:** {project['details']}")
-    
-    # Subtasks with progress
+
     st.markdown("#### 📌 Subtasks")
     total = 0
     for tidx, task in enumerate(project['subtasks']):
@@ -48,13 +46,11 @@ for idx, project in enumerate(filtered_projects):
         project['subtasks'][tidx]['progress'] = progress
         total += progress
         st.progress(progress / 100)
-    
-    # Overall progress
+
     avg_progress = total / len(project['subtasks']) if project['subtasks'] else 0
     st.markdown(f"**Overall Progress:** {avg_progress:.0f}%")
     st.progress(avg_progress / 100)
 
-    # Comment section
     st.markdown("#### 💬 Comments")
     for cidx, c in enumerate(comments_db.get(project['title'], [])):
         st.info(f"**{c['user']}** ({c['timestamp']}): {c['comment']}")
@@ -86,10 +82,45 @@ for idx, project in enumerate(filtered_projects):
                 json.dump(comments_db, f, indent=2)
             st.success("Comment posted.")
 
-    # Save progress updates
+    with st.expander("🔐 Manage This Project"):
+        action = st.radio("Choose an action:", ["None", "Edit", "Delete"], key=f"action_{idx}")
+        pw_input = st.text_input("Enter project password", type="password", key=f"project_pw_{idx}")
+        if action == "Delete" and pw_input == project["password"]:
+            projects.remove(project)
+            with open(PROJECTS_FILE, "w") as f:
+                json.dump(projects, f, indent=2)
+            st.success("Project deleted. Please refresh.")
+            st.stop()
+        elif action == "Edit" and pw_input == project["password"]:
+            st.session_state["edit_index"] = idx
+            st.experimental_rerun()
+
     with open(PROJECTS_FILE, "w") as f:
         json.dump(projects, f, indent=2)
 
+# Show Edit Form if requested
+if edit_index is not None and edit_index < len(projects):
+    st.markdown("## ✏️ Edit Project")
+    proj = projects[edit_index]
+    with st.form("edit_project_form"):
+        proj["title"] = st.text_input("Project Title", value=proj["title"])
+        proj["owner"] = st.text_input("Owner Name", value=proj["owner"])
+        proj["target_period"] = st.text_input("Target Period", value=proj["target_period"])
+        proj["notes"] = st.text_area("Notes", value=proj["notes"])
+        proj["details"] = st.text_area("Full Description", value=proj["details"])
+        for i, task in enumerate(proj["subtasks"]):
+            task["name"] = st.text_input(f"Task Name {i+1}", value=task["name"], key=f"edit_task_name_{i}")
+            date_obj = datetime.strptime(task["target_date"], "%Y-%m-%d").date()
+            task["target_date"] = st.date_input(f"Target Date {i+1}", value=date_obj, key=f"edit_task_date_{i}").strftime("%Y-%m-%d")
+        submit_edit = st.form_submit_button("Save Changes")
+        if submit_edit:
+            with open(PROJECTS_FILE, "w") as f:
+                json.dump(projects, f, indent=2)
+            st.success("Project updated!")
+            st.session_state["edit_index"] = None
+            st.experimental_rerun()
+
+# Add New Project Form
 st.markdown("---")
 st.markdown("## ➕ Add New Project")
 with st.form("new_project_form"):
