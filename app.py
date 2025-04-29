@@ -143,6 +143,21 @@ with st.form("new_project_form"):
         due = st.date_input(f"Target Date {i+1}", key=f"task_date_{i}")
         subtasks.append({"name": name, "progress": 0, "target_date": due.strftime("%Y-%m-%d")})
 
+    
+    if submit and title and owner and pw:
+        new_proj = {
+            "title": title,
+            "owner": owner,
+            "target_period": target_period,
+            "notes": notes,
+            "details": details,
+            "password": pw,
+            "subtasks": subtasks
+        }
+        projects.append(new_proj)
+        with open(PROJECTS_FILE, "w") as f:
+            json.dump(projects, f, indent=2)
+        st.success("✅ Project added! Please manually refresh the page to view it.")
     pw = st.text_input("Password to manage this project", type="password")
     submit = st.form_submit_button("Create Project")
     if submit and title and owner and pw:
@@ -159,3 +174,4 @@ with st.form("new_project_form"):
         with open(PROJECTS_FILE, "w") as f:
             json.dump(projects, f, indent=2)
         st.success("✅ Project added! Please manually refresh the page to view it.")
+
