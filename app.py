@@ -53,17 +53,19 @@ for idx, project in enumerate(filtered_projects):
 
     st.markdown("#### 💬 Comments")
     for cidx, c in enumerate(comments_db.get(project['title'], [])):
-        st.info(f"**{c['user']}** ({c['timestamp']}): {c['comment']}")
-        if st.button(f"🗑️ Delete Comment {cidx+1}", key=f"delcom_{idx}_{cidx}"):
-            password = st.text_input("Enter comment password", type="password", key=f"delpw_{idx}_{cidx}")
-            if password == c['password']:
-                comments_db[project['title']].pop(cidx)
-                with open(COMMENTS_FILE, "w") as f:
-                    json.dump(comments_db, f, indent=2)
-                st.success("Comment deleted. Please reload.")
-                st.stop()
-            else:
-                st.error("Incorrect password.")
+        with st.expander(f"🗨️ {c['user']} ({c['timestamp']})"):
+            st.write(c["comment"])
+            with st.form(f"del_comment_form_{idx}_{cidx}"):
+                password_input = st.text_input("Enter comment password to delete", type="password", key=f"pw_{idx}_{cidx}")
+                submit_delete = st.form_submit_button("Delete Comment")
+                if submit_delete:
+                    if password_input == c['password']:
+                        comments_db[project['title']].pop(cidx)
+                        with open(COMMENTS_FILE, "w") as f:
+                            json.dump(comments_db, f, indent=2)
+                        st.success("Comment deleted. Please refresh the page.")
+                    else:
+                        st.error("Incorrect password.")
 
     with st.form(f"form_comment_{idx}"):
         user = st.text_input("Your Name")
@@ -89,11 +91,11 @@ for idx, project in enumerate(filtered_projects):
             projects.remove(project)
             with open(PROJECTS_FILE, "w") as f:
                 json.dump(projects, f, indent=2)
-            st.success("Project deleted. Please refresh.")
+            st.success("Project deleted. Please refresh the page.")
             st.stop()
         elif action == "Edit" and pw_input == project["password"]:
             st.session_state["edit_index"] = idx
-            st.experimental_rerun()
+            st.success("✅ Password accepted. Scroll down to edit the project.")
 
     with open(PROJECTS_FILE, "w") as f:
         json.dump(projects, f, indent=2)
@@ -116,9 +118,8 @@ if edit_index is not None and edit_index < len(projects):
         if submit_edit:
             with open(PROJECTS_FILE, "w") as f:
                 json.dump(projects, f, indent=2)
-            st.success("Project updated!")
+            st.success("✅ Project updated! Please manually refresh the page to see changes.")
             st.session_state["edit_index"] = None
-            st.experimental_rerun()
 
 # Add New Project Form
 st.markdown("---")
@@ -153,4 +154,4 @@ with st.form("new_project_form"):
         projects.append(new_proj)
         with open(PROJECTS_FILE, "w") as f:
             json.dump(projects, f, indent=2)
-        st.success("✅ Project added! Refresh the page to view it.")
+        st.success("✅ Project added! Please manually refresh the page to view it.")
