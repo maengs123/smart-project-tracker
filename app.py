@@ -31,7 +31,10 @@ selected_owner = st.selectbox("🔍 Filter by Owner", ["All"] + owners)
 
 filtered_projects = [p for p in projects if selected_owner == "All" or p['owner'] == selected_owner]
 
-# Handle edits or deletions
+# Temporary session variable for password-validated edit
+if "edit_unlocked_index" not in st.session_state:
+    st.session_state["edit_unlocked_index"] = None
+
 for idx, project in enumerate(filtered_projects):
     st.markdown(f"### 📁 {project['title']}")
     st.markdown(f"👤 **Owner:** {project['owner']} &nbsp;&nbsp; 🎯 **Target Period:** {project['target_period']}")
@@ -94,16 +97,16 @@ for idx, project in enumerate(filtered_projects):
             st.success("Project deleted. Please refresh the page.")
             st.stop()
         elif action == "Edit" and pw_input == project["password"]:
-            st.session_state["edit_index"] = idx
-            st.success("✅ Password accepted. Scroll down to edit the project.")
+            st.session_state["edit_unlocked_index"] = idx
 
     with open(PROJECTS_FILE, "w") as f:
         json.dump(projects, f, indent=2)
 
-# Show Edit Form if requested
-if edit_index is not None and edit_index < len(projects):
+# Display inline edit form if password was validated
+edit_idx = st.session_state.get("edit_unlocked_index")
+if edit_idx is not None and edit_idx < len(projects):
     st.markdown("## ✏️ Edit Project")
-    proj = projects[edit_index]
+    proj = projects[edit_idx]
     with st.form("edit_project_form"):
         proj["title"] = st.text_input("Project Title", value=proj["title"])
         proj["owner"] = st.text_input("Owner Name", value=proj["owner"])
@@ -119,7 +122,7 @@ if edit_index is not None and edit_index < len(projects):
             with open(PROJECTS_FILE, "w") as f:
                 json.dump(projects, f, indent=2)
             st.success("✅ Project updated! Please manually refresh the page to see changes.")
-            st.session_state["edit_index"] = None
+            st.session_state["edit_unlocked_index"] = None
 
 # Add New Project Form
 st.markdown("---")
