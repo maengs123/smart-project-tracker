@@ -61,7 +61,8 @@ with st.form("new_project_form"):
     if category == "Pipeline":
         priority = st.selectbox("Priority", PRIORITY_OPTIONS)
     notes = st.text_area("Notes")
-    details = st.text_area("Details")
+    # details = st.text_area("Details")
+    details = st.text_area("Bottlenecks or Concerns")
     password = st.text_input("Password to manage this project", type="password")
     submitted = st.form_submit_button("Add Project")
 
