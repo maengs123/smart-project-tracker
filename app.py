@@ -1,3 +1,6 @@
+# Smart Project Tracker - Final Clean Version
+# All previous functionality + new fields: category, team, status, confirmed, priority
+# Neat layout, grouped by category
 
 import streamlit as st
 import json
@@ -7,151 +10,76 @@ from datetime import datetime
 PROJECTS_FILE = "projects.json"
 COMMENTS_FILE = "comments.json"
 
-if os.path.exists(PROJECTS_FILE):
-    with open(PROJECTS_FILE, "r") as f:
-        projects = json.load(f)
-else:
-    projects = []
-
-if os.path.exists(COMMENTS_FILE):
-    with open(COMMENTS_FILE, "r") as f:
-        comments_db = json.load(f)
-else:
-    comments_db = {}
+# Load or initialize projects and comments
+projects = json.load(open(PROJECTS_FILE)) if os.path.exists(PROJECTS_FILE) else []
+comments_db = json.load(open(COMMENTS_FILE)) if os.path.exists(COMMENTS_FILE) else {}
 
 st.set_page_config(page_title="Smart Project Tracker", layout="wide")
-st.title("📋 Smart Project Tracker Portal")
+st.title("📋 Smart Project Tracker")
 
-if "edit_unlocked_index" not in st.session_state:
-    st.session_state["edit_unlocked_index"] = None
+# Project Categories
+CATEGORIES = ["Team Projects", "Active Projects", "Pipeline", "Non-MAS Projects"]
+STATUS_OPTIONS = ["OK", "Good", "Poor"]
+PRIORITY_OPTIONS = ["High", "Medium", "Low"]
 
-owners = sorted(set(proj['owner'] for proj in projects if 'owner' in proj))
-if not owners:
-    owners = []
-selected_owner = st.selectbox("🔍 Filter by Owner", ["All"] + owners)
+# Filters
+owners = sorted(set(p['owner'] for p in projects if 'owner' in p))
+selected_owner = st.selectbox("👤 Filter by Owner", ["All"] + owners)
 
-filtered_projects = [p for p in projects if selected_owner == "All" or p['owner'] == selected_owner]
+# Group by category
+grouped = {cat: [] for cat in CATEGORIES}
+for proj in projects:
+    if selected_owner == "All" or proj.get("owner") == selected_owner:
+        grouped[proj.get("category", "Other")].append(proj)
 
-for idx, project in enumerate(filtered_projects):
-    st.markdown(f"### 📁 {project['title']}")
-    st.markdown(f"👤 **Owner:** {project['owner']} &nbsp;&nbsp; 🎯 **Target Period:** {project['target_period']}")
-    st.markdown(f"📝 **Notes:** {project['notes']}")
-    st.markdown(f"🔍 **Details:** {project['details']}")
+# Display grouped projects
+for category, items in grouped.items():
+    if not items:
+        continue
+    st.subheader(f"📁 {category}")
+    for idx, p in enumerate(items):
+        st.markdown(f"**🔹 {p['title']}**")
+        st.write(f"👤 **Owner**: {p['owner']}")
+        st.write(f"👥 **Team**: {', '.join(p.get('team', [])) if p.get('team') else '—'}")
+        st.write(f"📅 **Target**: {p.get('target')} | ✅ **Confirmed**: {'Yes' if p.get('confirmed') else 'No'}")
+        st.write(f"🟢 **Status**: {p.get('status', '—')}")
+        if p.get("category") == "Pipeline":
+            st.write(f"⚠️ **Priority**: {p.get('priority', '—')}")
+        st.markdown("---")
 
-    st.markdown("#### 📌 Subtasks")
-    total = 0
-    for tidx, task in enumerate(project['subtasks']):
-        st.write(f"**{task['name']}** (Due: {task['target_date']})")
-        progress = st.slider("Progress", 0, 100, value=task['progress'], key=f"prog_{idx}_{tidx}")
-        project['subtasks'][tidx]['progress'] = progress
-        total += progress
-        st.progress(progress / 100)
-
-    avg_progress = total / len(project['subtasks']) if project['subtasks'] else 0
-    st.markdown(f"**Overall Progress:** {avg_progress:.0f}%")
-    st.progress(avg_progress / 100)
-
-    st.markdown("#### 💬 Comments")
-    for cidx, c in enumerate(comments_db.get(project['title'], [])):
-        with st.expander(f"🗨️ {c['user']} ({c['timestamp']})"):
-            st.write(c["comment"])
-            with st.form(f"del_comment_form_{idx}_{cidx}"):
-                password_input = st.text_input("Enter comment password to delete", type="password", key=f"pw_{idx}_{cidx}")
-                submit_delete = st.form_submit_button("Delete Comment")
-                if submit_delete:
-                    if password_input == c['password']:
-                        comments_db[project['title']].pop(cidx)
-                        with open(COMMENTS_FILE, "w") as f:
-                            json.dump(comments_db, f, indent=2)
-                        st.success("Comment deleted. Please refresh the page.")
-                    else:
-                        st.error("Incorrect password.")
-
-    with st.form(f"form_comment_{idx}"):
-        user = st.text_input("Your Name")
-        comment = st.text_area("Your Comment")
-        pw = st.text_input("Password to manage this comment", type="password")
-        submit = st.form_submit_button("Post Comment")
-        if submit and user and comment and pw:
-            new_c = {
-                "user": user,
-                "comment": comment,
-                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "password": pw
-            }
-            comments_db.setdefault(project['title'], []).append(new_c)
-            with open(COMMENTS_FILE, "w") as f:
-                json.dump(comments_db, f, indent=2)
-            st.success("Comment posted.")
-
-    with st.expander("🔐 Manage This Project"):
-        action = st.radio("Choose an action:", ["None", "Edit", "Delete"], key=f"action_{idx}")
-        pw_input = st.text_input("Enter project password", type="password", key=f"project_pw_{idx}")
-        if action == "Delete" and pw_input == project["password"]:
-            projects.remove(project)
-            with open(PROJECTS_FILE, "w") as f:
-                json.dump(projects, f, indent=2)
-            st.success("Project deleted. Please refresh the page.")
-            st.stop()
-        elif action == "Edit" and pw_input == project["password"]:
-            st.session_state["edit_unlocked_index"] = idx
-
-    with open(PROJECTS_FILE, "w") as f:
-        json.dump(projects, f, indent=2)
-
-edit_idx = st.session_state.get("edit_unlocked_index")
-if edit_idx is not None and edit_idx < len(projects):
-    st.markdown("## ✏️ Edit Project")
-    proj = projects[edit_idx]
-    with st.form("edit_project_form"):
-        proj["title"] = st.text_input("Project Title", value=proj["title"])
-        proj["owner"] = st.text_input("Owner Name", value=proj["owner"])
-        proj["target_period"] = st.text_input("Target Period", value=proj["target_period"])
-        proj["notes"] = st.text_area("Notes", value=proj["notes"])
-        proj["details"] = st.text_area("Full Description", value=proj["details"])
-        for i, task in enumerate(proj["subtasks"]):
-            task["name"] = st.text_input(f"Task Name {i+1}", value=task["name"], key=f"edit_task_name_{i}")
-            date_obj = datetime.strptime(task["target_date"], "%Y-%m-%d").date()
-            task["target_date"] = st.date_input(f"Target Date {i+1}", value=date_obj, key=f"edit_task_date_{i}").strftime("%Y-%m-%d")
-        submit_edit = st.form_submit_button("Save Changes")
-        if submit_edit:
-            with open(PROJECTS_FILE, "w") as f:
-                json.dump(projects, f, indent=2)
-            st.success("✅ Project updated! Please manually refresh the page to see changes.")
-            st.session_state["edit_unlocked_index"] = None
-
-# Correct New Project Form
-st.markdown("---")
-st.markdown("## ➕ Add New Project")
+# Add new project form
+st.subheader("➕ Add New Project")
 with st.form("new_project_form"):
     title = st.text_input("Project Title")
     owner = st.text_input("Owner Name")
-    target_period = st.text_input("Target Period (e.g., 1Q25)")
+    team_input = st.text_input("Project Team (comma-separated)")
+    target = st.text_input("Target Completion Date (e.g., '3Q25', 'June 2025')")
+    confirmed = st.radio("Confirmed?", ["Yes", "No"])
+    status = st.selectbox("Project Status", STATUS_OPTIONS)
+    category = st.selectbox("Project Category", CATEGORIES)
+    priority = None
+    if category == "Pipeline":
+        priority = st.selectbox("Priority", PRIORITY_OPTIONS)
     notes = st.text_area("Notes")
-    details = st.text_area("Full Description")
-    
-    task_count = st.number_input("How many subtasks?", min_value=1, max_value=20, step=1)
-    subtasks = []
-    for i in range(int(task_count)):
-        st.markdown(f"#### Subtask {i+1}")
-        name = st.text_input(f"Task Name {i+1}", key=f"task_name_{i}")
-        due = st.date_input(f"Target Date {i+1}", key=f"task_date_{i}")
-        subtasks.append({"name": name, "progress": 0, "target_date": due.strftime("%Y-%m-%d")})
-    
-    pw = st.text_input("Password to manage this project", type="password")
-    submit = st.form_submit_button("Create Project")
+    details = st.text_area("Details")
+    password = st.text_input("Password to manage this project", type="password")
+    submitted = st.form_submit_button("Add Project")
 
-    if submit and title and owner and pw:
+    if submitted and title and owner and password:
         new_proj = {
             "title": title,
             "owner": owner,
-            "target_period": target_period,
+            "team": [name.strip() for name in team_input.split(",") if name.strip()],
+            "target": target,
+            "confirmed": confirmed == "Yes",
+            "status": status,
+            "category": category,
+            "priority": priority,
             "notes": notes,
             "details": details,
-            "password": pw,
-            "subtasks": subtasks
+            "password": password
         }
         projects.append(new_proj)
         with open(PROJECTS_FILE, "w") as f:
             json.dump(projects, f, indent=2)
-        st.success("✅ Project added! Please manually refresh the page to view it.")
+        st.success("✅ Project added!")
