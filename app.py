@@ -213,6 +213,7 @@ if page == "📊 Summary View":
     else:
         df = pd.DataFrame([
             {
+                "Project Title": p.get("title", ""),
                 "Business Function": p.get("business_function", ""),
                 "Category": p.get("category", ""),
                 "Owner": p.get("owner", ""),
