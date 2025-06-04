@@ -64,9 +64,14 @@ if page == "📋 Project Tracker":
             st.write(f"👥 **Team**: {', '.join(p.get('team', []) or [])}")
             st.write(f"📅 **Target**: {p.get('target', '—')}")
 
+            # status = p.get("status", "—")
+            # status_color = STATUS_COLORS.get(status, "#999")
+            # st.markdown(f"<span style='color:{status_color}; font-weight:bold;'>🟢 Status: {status}</span>", unsafe_allow_html=True)
             status = p.get("status", "—")
             status_color = STATUS_COLORS.get(status, "#999")
-            st.markdown(f"<span style='color:{status_color}; font-weight:bold;'>🟢 Status: {status}</span>", unsafe_allow_html=True)
+            status_icon = {"Good": "🟢", "OK": "🟡", "Poor": "🔴"}.get(status, "⚪")
+            st.markdown(f"<span style='color:{status_color}; font-weight:bold;'>{status_icon} Status: {status}</span>", unsafe_allow_html=True)
+
 
             if p.get("category") == "Pipeline":
                 st.write(f"⚠️ **Priority**: {p.get('priority', '—')}")
