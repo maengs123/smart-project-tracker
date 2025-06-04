@@ -6,17 +6,35 @@ from datetime import datetime
 PROJECTS_FILE = "projects.json"
 COMMENTS_FILE = "comments.json"
 
+# Load data
 projects = json.load(open(PROJECTS_FILE)) if os.path.exists(PROJECTS_FILE) else []
 comments_db = json.load(open(COMMENTS_FILE)) if os.path.exists(COMMENTS_FILE) else {}
 
 st.set_page_config(page_title="Smart Project Tracker", layout="wide")
 st.title("📋 Smart Project Tracker Portal")
 
+# Generate target quarter options
+def generate_quarter_options():
+    now = datetime.now()
+    year = now.year
+    month = now.month
+    current_q = (month - 1) // 3 + 1
+    quarters = []
+    for i in range(3):
+        q = current_q + i
+        y = year
+        if q > 4:
+            q -= 4
+            y += 1
+        quarters.append(f"{q}Q{y}")
+    quarters.append("TBD")
+    return quarters
+
+# Constants
 CATEGORIES = ["Team Projects", "Active Projects", "Pipeline", "Non-MAS Projects"]
 BUSINESS_FUNCTIONS = ["MAS PM", "Index Management", "ETF Research", "Trading and Ops"]
 STATUS_OPTIONS = ["OK", "Good", "Poor"]
 PRIORITY_OPTIONS = ["High", "Medium", "Low"]
-
 owners = sorted(set(p['owner'] for p in projects if 'owner' in p))
 selected_owner = st.selectbox("👤 Filter by Owner", ["All"] + owners)
 
@@ -45,7 +63,7 @@ for category, items in grouped.items():
         st.write(f"📝 **Notes**: {p.get('notes', '')}")
         st.write(f"🛠️ **Bottlenecks**: {p.get('bottlenecks', '')}")
 
-        # Progress bar (editable only in edit mode)
+        # Progress bar
         if edit_mode and edit_idx == idx:
             p["progress"] = st.slider("📊 Project Progress", 0, 100, value=p.get("progress", 0), key=f"progress_{idx}")
             with open(PROJECTS_FILE, "w") as f:
@@ -59,9 +77,8 @@ for category, items in grouped.items():
         for cidx, c in enumerate(comments_db.get(p['title'], [])):
             st.info(f"**{c['user']}** ({c['timestamp']}): {c['comment']}")
             if "replies" in c:
-                for ridx, r in enumerate(c["replies"]):
-                    st.markdown(f"<div style='margin-left: 20px;'>↪️ <b>{r['user']}</b> ({r['timestamp']}): {r['comment']}</div>",
-                                unsafe_allow_html=True)
+                for r in c["replies"]:
+                    st.markdown(f"<div style='margin-left: 20px;'>↪️ <b>{r['user']}</b> ({r['timestamp']}): {r['comment']}</div>", unsafe_allow_html=True)
             with st.expander("💬 Reply or 🗑️ Delete this comment"):
                 reply_user = st.text_input(f"Reply Name {idx}_{cidx}")
                 reply_text = st.text_area(f"Reply Message {idx}_{cidx}")
@@ -74,7 +91,7 @@ for category, items in grouped.items():
                     })
                     with open(COMMENTS_FILE, "w") as f:
                         json.dump(comments_db, f, indent=2)
-                    st.success("Reply posted! Please refresh.")
+                    st.success("Reply posted. Please refresh.")
                 del_pw = st.text_input("Password to delete comment", type="password", key=f"delpw_{idx}_{cidx}")
                 if st.button("Delete Comment", key=f"delbtn_{idx}_{cidx}"):
                     if del_pw == c["password"]:
@@ -85,7 +102,7 @@ for category, items in grouped.items():
                     else:
                         st.error("Incorrect password.")
 
-        with st.form(f"form_comment_{idx}"):
+        with st.form(f"form_comment_{idx}_{p['title']}"):
             user = st.text_input("Your Name")
             comment = st.text_area("Your Comment")
             pw = st.text_input("Password to delete this comment", type="password")
@@ -114,10 +131,9 @@ for category, items in grouped.items():
                 st.session_state["edit_mode"] = p
                 st.session_state["edit_idx"] = idx
                 st.success("Edit mode activated. Scroll to bottom.")
-
         st.markdown("---")
 
-# Form to add/edit project
+# Form to add or edit project
 st.subheader("➕ Add or Edit Project")
 edit_mode = st.session_state.get("edit_mode")
 with st.form("project_form", clear_on_submit=not edit_mode):
@@ -126,7 +142,8 @@ with st.form("project_form", clear_on_submit=not edit_mode):
     team_input = st.text_input("Team (comma-separated)", value=", ".join(edit_mode["team"]) if edit_mode else "")
     business_function = st.selectbox("Business Function", BUSINESS_FUNCTIONS,
                                      index=BUSINESS_FUNCTIONS.index(edit_mode["business_function"]) if edit_mode else 0)
-    target = st.text_input("Target Completion", value=edit_mode["target"] if edit_mode else "")
+    target = st.selectbox("Target Completion", generate_quarter_options(),
+                          index=generate_quarter_options().index(edit_mode["target"]) if edit_mode and edit_mode["target"] in generate_quarter_options() else len(generate_quarter_options()) - 1)
     confirmed = st.radio("Confirmed?", ["Yes", "No"], index=0 if edit_mode and edit_mode["confirmed"] else 1)
     status = st.selectbox("Status", STATUS_OPTIONS,
                           index=STATUS_OPTIONS.index(edit_mode["status"]) if edit_mode else 0)
