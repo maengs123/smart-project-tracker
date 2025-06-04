@@ -72,14 +72,17 @@ if page == "📋 Project Tracker":
             st.write(f"📝 **Notes**: {p.get('notes', '')}")
             st.write(f"🛠️ **Bottlenecks**: {p.get('bottlenecks', '')}")
 
-            # Progress bar
-            if edit_mode and edit_idx == idx:
-                p["progress"] = st.slider("📊 Project Progress", 0, 100, value=p.get("progress", 0), key=f"progress_{idx}")
-                with open(PROJECTS_FILE, "w") as f:
-                    json.dump(projects, f, indent=2)
-            else:
-                st.write(f"**Progress:** {p.get('progress', 0)}%")
-                st.progress(p.get("progress", 0) / 100)
+            # Progress bar (read-only view)
+            st.write(f"**Progress:** {p.get('progress', 0)}%")
+            st.progress(p.get("progress", 0) / 100)
+
+            # if edit_mode and edit_idx == idx:
+            #     p["progress"] = st.slider("📊 Project Progress", 0, 100, value=p.get("progress", 0), key=f"progress_{idx}")
+            #     with open(PROJECTS_FILE, "w") as f:
+            #         json.dump(projects, f, indent=2)
+            # else:
+            #     st.write(f"**Progress:** {p.get('progress', 0)}%")
+            #     st.progress(p.get("progress", 0) / 100)
 
             # Comment section
             st.markdown("#### 💬 Comments")
