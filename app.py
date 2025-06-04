@@ -36,7 +36,7 @@ def generate_quarter_options():
     quarters.append("TBD")
     return quarters
 
-# Sidebar
+# Sidebar navigation
 page = st.sidebar.radio("Navigate", ["📋 Project Tracker", "📊 Summary View"])
 owners = sorted(set(p['owner'] for p in projects if 'owner' in p))
 selected_owner = st.sidebar.selectbox("👤 Filter by Owner", ["All"] + owners)
@@ -61,8 +61,8 @@ if page == "📋 Project Tracker":
             st.markdown(f"### 🔹 {p['title']}")
             st.write(f"👤 **Owner**: {p['owner']}")
             st.write(f"🏢 **Business Function**: {p.get('business_function', '—')}")
-            st.write(f"👥 **Team**: {', '.join(p.get('team', [])) if p.get('team') else '—'}")
-            st.write(f"📅 **Target**: {p.get('target', '—')} | ✅ **Confirmed**: {'Yes' if p.get('confirmed') else 'No'}")
+            st.write(f"👥 **Team**: {', '.join(p.get('team', []) or [])}")
+            st.write(f"📅 **Target**: {p.get('target', '—')}")
 
             status = p.get("status", "—")
             status_color = STATUS_COLORS.get(status, "#999")
@@ -77,8 +77,8 @@ if page == "📋 Project Tracker":
 
             # Manage
             with st.expander("🔐 Manage Project"):
-                action = st.radio("Action", ["None", "Edit", "Delete"], key=f"action_{idx}")
-                pw_input = st.text_input("Password", type="password", key=f"pw_proj_{idx}")
+                action = st.radio("Action", ["None", "Edit", "Delete"], key=f"action_{idx}_{p['title']}")
+                pw_input = st.text_input("Password", type="password", key=f"pw_proj_{idx}_{p['title']}")
                 if action == "Delete" and pw_input == p["password"]:
                     projects.remove(p)
                     with open(PROJECTS_FILE, "w") as f:
@@ -102,7 +102,6 @@ if page == "📋 Project Tracker":
                                          index=BUSINESS_FUNCTIONS.index(edit_mode["business_function"]) if edit_mode else 0)
         target = st.selectbox("Target Completion", generate_quarter_options(),
                               index=generate_quarter_options().index(edit_mode["target"]) if edit_mode and edit_mode["target"] in generate_quarter_options() else len(generate_quarter_options()) - 1)
-        confirmed = st.radio("Confirmed?", ["Yes", "No"], index=0 if edit_mode and edit_mode["confirmed"] else 1)
         status = st.selectbox("Status", STATUS_OPTIONS,
                               index=STATUS_OPTIONS.index(edit_mode["status"]) if edit_mode else 0)
         category = st.selectbox("Category", CATEGORIES,
@@ -119,14 +118,13 @@ if page == "📋 Project Tracker":
             if not title or not owner or not password:
                 st.warning("Please fill in required fields.")
             else:
-                team = [t.strip() for t in team_input.split(",") if t.strip()]
+                team = [t.strip() for t in team_input.split(",") if t.strip()] if team_input else []
                 project = {
                     "title": title,
                     "owner": owner,
                     "team": team,
                     "business_function": business_function,
                     "target": target,
-                    "confirmed": confirmed == "Yes",
                     "status": status,
                     "category": category,
                     "priority": priority,
@@ -161,7 +159,7 @@ elif page == "📊 Summary View":
                 "Business Function": p.get("business_function", ""),
                 "Category": p.get("category", ""),
                 "Owner": p.get("owner", ""),
-                "Team": ", ".join(p.get("team", [])),
+                "Team": ", ".join(p.get("team", []) or []),
                 "Target": p.get("target", ""),
                 "Status": p.get("status", ""),
                 "Progress (%)": p.get("progress", 0)
