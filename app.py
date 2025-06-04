@@ -6,7 +6,6 @@ from datetime import datetime
 PROJECTS_FILE = "projects.json"
 COMMENTS_FILE = "comments.json"
 
-# Load data
 projects = json.load(open(PROJECTS_FILE)) if os.path.exists(PROJECTS_FILE) else []
 comments_db = json.load(open(COMMENTS_FILE)) if os.path.exists(COMMENTS_FILE) else {}
 
@@ -18,17 +17,18 @@ BUSINESS_FUNCTIONS = ["MAS PM", "Index Management", "ETF Research", "Trading and
 STATUS_OPTIONS = ["OK", "Good", "Poor"]
 PRIORITY_OPTIONS = ["High", "Medium", "Low"]
 
-# Filter
 owners = sorted(set(p['owner'] for p in projects if 'owner' in p))
 selected_owner = st.selectbox("👤 Filter by Owner", ["All"] + owners)
 
-# Group projects
 grouped = {cat: [] for cat in CATEGORIES}
 for proj in projects:
     if selected_owner == "All" or proj.get("owner") == selected_owner:
         grouped[proj.get("category", "Other")].append(proj)
 
-# Display projects
+edit_mode = st.session_state.get("edit_mode")
+edit_idx = st.session_state.get("edit_idx")
+
+# Display all projects
 for category, items in grouped.items():
     if not items:
         continue
@@ -45,21 +45,39 @@ for category, items in grouped.items():
         st.write(f"📝 **Notes**: {p.get('notes', '')}")
         st.write(f"🛠️ **Bottlenecks**: {p.get('bottlenecks', '')}")
 
-        # Progress Bar
-        st.write(f"**Progress:** {p.get('progress', 0)}%")
-        p["progress"] = st.slider("📊 Project Progress", 0, 100, value=p.get("progress", 0), key=f"progress_{idx}")
-        st.progress(p["progress"] / 100)
-        with open(PROJECTS_FILE, "w") as f:
-            json.dump(projects, f, indent=2)
+        # Progress bar (editable only in edit mode)
+        if edit_mode and edit_idx == idx:
+            p["progress"] = st.slider("📊 Project Progress", 0, 100, value=p.get("progress", 0), key=f"progress_{idx}")
+            with open(PROJECTS_FILE, "w") as f:
+                json.dump(projects, f, indent=2)
+        else:
+            st.write(f"**Progress:** {p.get('progress', 0)}%")
+            st.progress(p.get("progress", 0) / 100)
 
-        # Comments
+        # Comments section
         st.markdown("#### 💬 Comments")
         for cidx, c in enumerate(comments_db.get(p['title'], [])):
             st.info(f"**{c['user']}** ({c['timestamp']}): {c['comment']}")
-            with st.expander("🗑️ Delete this comment"):
-                pw = st.text_input("Enter password", type="password", key=f"pw_{idx}_{cidx}")
-                if st.button("Delete Comment", key=f"delcom_{idx}_{cidx}"):
-                    if pw == c['password']:
+            if "replies" in c:
+                for ridx, r in enumerate(c["replies"]):
+                    st.markdown(f"<div style='margin-left: 20px;'>↪️ <b>{r['user']}</b> ({r['timestamp']}): {r['comment']}</div>",
+                                unsafe_allow_html=True)
+            with st.expander("💬 Reply or 🗑️ Delete this comment"):
+                reply_user = st.text_input(f"Reply Name {idx}_{cidx}")
+                reply_text = st.text_area(f"Reply Message {idx}_{cidx}")
+                reply_submit = st.button(f"Post Reply {idx}_{cidx}")
+                if reply_submit and reply_user and reply_text:
+                    c.setdefault("replies", []).append({
+                        "user": reply_user,
+                        "comment": reply_text,
+                        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    })
+                    with open(COMMENTS_FILE, "w") as f:
+                        json.dump(comments_db, f, indent=2)
+                    st.success("Reply posted! Please refresh.")
+                del_pw = st.text_input("Password to delete comment", type="password", key=f"delpw_{idx}_{cidx}")
+                if st.button("Delete Comment", key=f"delbtn_{idx}_{cidx}"):
+                    if del_pw == c["password"]:
                         comments_db[p['title']].pop(cidx)
                         with open(COMMENTS_FILE, "w") as f:
                             json.dump(comments_db, f, indent=2)
@@ -67,7 +85,7 @@ for category, items in grouped.items():
                     else:
                         st.error("Incorrect password.")
 
-        with st.form(f"comment_form_{idx}"):
+        with st.form(f"form_comment_{idx}"):
             user = st.text_input("Your Name")
             comment = st.text_area("Your Comment")
             pw = st.text_input("Password to delete this comment", type="password")
@@ -77,13 +95,13 @@ for category, items in grouped.items():
                     "user": user,
                     "comment": comment,
                     "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "password": pw
+                    "password": pw,
+                    "replies": []
                 })
                 with open(COMMENTS_FILE, "w") as f:
                     json.dump(comments_db, f, indent=2)
                 st.success("Comment posted. Please refresh.")
 
-        # Edit/Delete Project
         with st.expander("🔐 Manage This Project"):
             action = st.radio("Action", ["None", "Edit", "Delete"], key=f"action_{idx}")
             pw_input = st.text_input("Enter project password", type="password", key=f"pw_proj_{idx}")
@@ -96,19 +114,18 @@ for category, items in grouped.items():
                 st.session_state["edit_mode"] = p
                 st.session_state["edit_idx"] = idx
                 st.success("Edit mode activated. Scroll to bottom.")
+
         st.markdown("---")
 
-# Add or Edit Project
+# Form to add/edit project
 st.subheader("➕ Add or Edit Project")
 edit_mode = st.session_state.get("edit_mode")
-with st.form("new_project_form", clear_on_submit=not edit_mode):
+with st.form("project_form", clear_on_submit=not edit_mode):
     title = st.text_input("Project Title", value=edit_mode["title"] if edit_mode else "")
-    owner = st.text_input("Owner Name", value=edit_mode["owner"] if edit_mode else "")
-    team_input = st.text_input("Project Team (comma-separated)",
-                               value=", ".join(edit_mode["team"]) if edit_mode else "")
+    owner = st.text_input("Owner", value=edit_mode["owner"] if edit_mode else "")
+    team_input = st.text_input("Team (comma-separated)", value=", ".join(edit_mode["team"]) if edit_mode else "")
     business_function = st.selectbox("Business Function", BUSINESS_FUNCTIONS,
-                                     index=BUSINESS_FUNCTIONS.index(edit_mode["business_function"])
-                                     if edit_mode else 0)
+                                     index=BUSINESS_FUNCTIONS.index(edit_mode["business_function"]) if edit_mode else 0)
     target = st.text_input("Target Completion", value=edit_mode["target"] if edit_mode else "")
     confirmed = st.radio("Confirmed?", ["Yes", "No"], index=0 if edit_mode and edit_mode["confirmed"] else 1)
     status = st.selectbox("Status", STATUS_OPTIONS,
@@ -128,7 +145,7 @@ with st.form("new_project_form", clear_on_submit=not edit_mode):
             st.warning("Please fill in required fields.")
         else:
             team = [t.strip() for t in team_input.split(",") if t.strip()]
-            new_proj = {
+            project = {
                 "title": title,
                 "owner": owner,
                 "team": team,
@@ -144,13 +161,14 @@ with st.form("new_project_form", clear_on_submit=not edit_mode):
                 "password": password
             }
 
-            if "edit_mode" in st.session_state:
-                projects[st.session_state["edit_idx"]] = new_proj
+            if edit_mode:
+                projects[edit_idx] = project
                 del st.session_state["edit_mode"]
                 del st.session_state["edit_idx"]
-                st.success("✅ Project updated! Please refresh.")
+                st.success("✅ Project updated. Please refresh.")
             else:
-                projects.append(new_proj)
-                st.success("✅ Project added! Please refresh.")
+                projects.append(project)
+                st.success("✅ Project added. Please refresh.")
+
             with open(PROJECTS_FILE, "w") as f:
                 json.dump(projects, f, indent=2)
