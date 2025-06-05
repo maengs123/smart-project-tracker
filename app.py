@@ -76,20 +76,7 @@ if page == "📋 Project Tracker":
             st.write(f"**Progress:** {p.get('progress', 0)}%")
             st.progress(p.get("progress", 0) / 100)
 
-            with st.expander("🔐 Manage Project"):
-                action = st.radio("Action", ["None", "Edit", "Delete"], key=f"action_{idx}_{p['title']}")
-                pw_input = st.text_input("Password", type="password", key=f"pw_proj_{idx}_{p['title']}")
-                if action == "Delete" and pw_input == p["password"]:
-                    projects.remove(p)
-                    with open(PROJECTS_FILE, "w") as f:
-                        json.dump(projects, f, indent=2)
-                    st.success("Project deleted. Please refresh.")
-                elif action == "Edit" and pw_input == p["password"]:
-                    st.session_state["edit_mode"] = p
-                    st.session_state["edit_idx"] = idx
-                    st.success("Edit mode enabled. Scroll down.")
-
-            # Comments & replies
+            # Comment section
             st.markdown("#### 💬 Comments")
             for cidx, c in enumerate(comments_db.get(p['title'], [])):
                 st.info(f"**{c['user']}** ({c['timestamp']}): {c['comment']}")
@@ -110,7 +97,7 @@ if page == "📋 Project Tracker":
                             json.dump(comments_db, f, indent=2)
                         st.success("Reply posted. Please refresh.")
                     del_pw = st.text_input("Password to delete comment", type="password", key=f"delpw_{idx}_{cidx}")
-                    if st.button("Delete Comment", key=f"delbtn_{idx}_{cidx}"):
+                    if st.button("Confirm Delete Comment", key=f"deletecomment_btn_{idx}_{cidx}"):
                         if del_pw == c["password"]:
                             comments_db[p['title']].pop(cidx)
                             with open(COMMENTS_FILE, "w") as f:
@@ -136,7 +123,22 @@ if page == "📋 Project Tracker":
                         json.dump(comments_db, f, indent=2)
                     st.success("Comment posted. Please refresh.")
 
+            with st.expander("🔐 Manage Project"):
+                action = st.radio("Action", ["None", "Edit", "Delete"], key=f"action_{idx}_{p['title']}")
+                pw_input = st.text_input("Password", type="password", key=f"pw_proj_{idx}_{p['title']}")
+                if action == "Delete" and pw_input == p["password"]:
+                    projects.remove(p)
+                    with open(PROJECTS_FILE, "w") as f:
+                        json.dump(projects, f, indent=2)
+                    st.success("Project deleted. Please refresh.")
+                elif action == "Edit" and pw_input == p["password"]:
+                    st.session_state["edit_mode"] = p
+                    st.session_state["edit_idx"] = idx
+                    st.success("Edit mode enabled. Scroll down.")
+
             st.markdown("---")
+
+# (form and summary view continue here, as previously posted)
 
     # Add/Edit form
     st.subheader("➕ Add or Edit Project")
