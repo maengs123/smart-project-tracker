@@ -41,7 +41,7 @@ page = st.sidebar.radio("Navigate", ["📋 Project Tracker", "📊 Summary View"
 owners = sorted(set(p['owner'] for p in projects if 'owner' in p))
 selected_owner = st.sidebar.selectbox("👤 Filter by Owner", ["All"] + owners)
 
-# ----------------- 📋 PROJECT TRACKER -----------------
+# -------------------- 📋 PROJECT TRACKER --------------------
 if page == "📋 Project Tracker":
     st.title("📋 Project Tracker")
 
@@ -64,14 +64,10 @@ if page == "📋 Project Tracker":
             st.write(f"👥 **Team**: {', '.join(p.get('team', []) or [])}")
             st.write(f"📅 **Target**: {p.get('target', '—')}")
 
-            # status = p.get("status", "—")
-            # status_color = STATUS_COLORS.get(status, "#999")
-            # st.markdown(f"<span style='color:{status_color}; font-weight:bold;'>🟢 Status: {status}</span>", unsafe_allow_html=True)
             status = p.get("status", "—")
             status_color = STATUS_COLORS.get(status, "#999")
             status_icon = {"Good": "🟢", "OK": "🟡", "Poor": "🔴"}.get(status, "⚪")
             st.markdown(f"<span style='color:{status_color}; font-weight:bold;'>{status_icon} Status: {status}</span>", unsafe_allow_html=True)
-
 
             if p.get("category") == "Pipeline":
                 st.write(f"⚠️ **Priority**: {p.get('priority', '—')}")
@@ -80,7 +76,6 @@ if page == "📋 Project Tracker":
             st.write(f"**Progress:** {p.get('progress', 0)}%")
             st.progress(p.get("progress", 0) / 100)
 
-            # Manage
             with st.expander("🔐 Manage Project"):
                 action = st.radio("Action", ["None", "Edit", "Delete"], key=f"action_{idx}_{p['title']}")
                 pw_input = st.text_input("Password", type="password", key=f"pw_proj_{idx}_{p['title']}")
@@ -93,6 +88,53 @@ if page == "📋 Project Tracker":
                     st.session_state["edit_mode"] = p
                     st.session_state["edit_idx"] = idx
                     st.success("Edit mode enabled. Scroll down.")
+
+            # Comments & replies
+            st.markdown("#### 💬 Comments")
+            for cidx, c in enumerate(comments_db.get(p['title'], [])):
+                st.info(f"**{c['user']}** ({c['timestamp']}): {c['comment']}")
+                if "replies" in c:
+                    for r in c["replies"]:
+                        st.markdown(f"<div style='margin-left: 20px;'>↪️ <b>{r['user']}</b> ({r['timestamp']}): {r['comment']}</div>", unsafe_allow_html=True)
+                with st.expander("💬 Reply or 🗑️ Delete this comment"):
+                    reply_user = st.text_input(f"Reply Name {idx}_{cidx}")
+                    reply_text = st.text_area(f"Reply Message {idx}_{cidx}")
+                    reply_submit = st.button(f"Post Reply {idx}_{cidx}")
+                    if reply_submit and reply_user and reply_text:
+                        c.setdefault("replies", []).append({
+                            "user": reply_user,
+                            "comment": reply_text,
+                            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        })
+                        with open(COMMENTS_FILE, "w") as f:
+                            json.dump(comments_db, f, indent=2)
+                        st.success("Reply posted. Please refresh.")
+                    del_pw = st.text_input("Password to delete comment", type="password", key=f"delpw_{idx}_{cidx}")
+                    if st.button("Delete Comment", key=f"delbtn_{idx}_{cidx}"):
+                        if del_pw == c["password"]:
+                            comments_db[p['title']].pop(cidx)
+                            with open(COMMENTS_FILE, "w") as f:
+                                json.dump(comments_db, f, indent=2)
+                            st.success("Comment deleted. Please refresh.")
+                        else:
+                            st.error("Incorrect password.")
+
+            with st.form(f"form_comment_{idx}_{p['title']}"):
+                user = st.text_input("Your Name")
+                comment = st.text_area("Your Comment")
+                pw = st.text_input("Password to delete this comment", type="password")
+                submit = st.form_submit_button("Post Comment")
+                if submit and user and comment and pw:
+                    comments_db.setdefault(p['title'], []).append({
+                        "user": user,
+                        "comment": comment,
+                        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "password": pw,
+                        "replies": []
+                    })
+                    with open(COMMENTS_FILE, "w") as f:
+                        json.dump(comments_db, f, indent=2)
+                    st.success("Comment posted. Please refresh.")
 
             st.markdown("---")
 
@@ -151,13 +193,30 @@ if page == "📋 Project Tracker":
                 with open(PROJECTS_FILE, "w") as f:
                     json.dump(projects, f, indent=2)
 
-# ----------------- 📊 SUMMARY VIEW -----------------
+# -------------------- 📊 SUMMARY VIEW --------------------
 elif page == "📊 Summary View":
     st.title("📊 Project Summary")
 
     if not projects:
         st.info("No projects available.")
     else:
+        # Filters
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            selected_function = st.selectbox("Filter by Business Function", ["All"] + sorted(set(p.get("business_function", "") for p in projects)))
+        with col2:
+            selected_category = st.selectbox("Filter by Category", ["All"] + sorted(set(p.get("category", "") for p in projects)))
+        with col3:
+            selected_owner = st.selectbox("Filter by Owner", ["All"] + sorted(set(p.get("owner", "") for p in projects)))
+
+        # Apply filters
+        filtered_projects = [
+            p for p in projects
+            if (selected_function == "All" or p.get("business_function") == selected_function)
+            and (selected_category == "All" or p.get("category") == selected_category)
+            and (selected_owner == "All" or p.get("owner") == selected_owner)
+        ]
+
         df = pd.DataFrame([
             {
                 "Project Title": p.get("title", ""),
@@ -169,7 +228,7 @@ elif page == "📊 Summary View":
                 "Status": p.get("status", ""),
                 "Progress (%)": p.get("progress", 0)
             }
-            for p in projects
+            for p in filtered_projects
         ])
 
         def style_status(val):
